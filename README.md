@@ -36,7 +36,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ### VS Code — Live Server
 
-Right-click `index.html` → **Open with Live Server**
+Right-click `index.html` → **Open with Live Server** (get extension in vs code)
 
 It usually opens at `http://127.0.0.1:5500/index.html`.
 
