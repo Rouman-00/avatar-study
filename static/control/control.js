@@ -14,17 +14,14 @@ const toggleLLM = document.getElementById('toggle-llm');
 //Condition toggles send immediately their state to backend to the avatar
 toggleLipsync.addEventListener('change', () => {
     channel.postMessage({ type: 'set_lipsync', payload: { enabled: toggleLipsync.checked } });
-    logSystem('Lipsync ' + (toggleLipsync.checked ? 'activated' : 'deactivated'));
 });
 
 toggleEmotion.addEventListener('change', () => {
     channel.postMessage({ type: 'set_emotion', payload: { enabled: toggleEmotion.checked } });
-    logSystem('Emotion ' + (toggleEmotion.checked ? 'activated' : 'deactivated'));
 });
 
 toggleLLM.addEventListener('change', () => {
     channel.postMessage({ type: 'set_llm', payload: { enabled: toggleLLM.checked } });
-    logSystem('LLM ' + (toggleLLM.checked ? 'activated' : 'deactivated'));
 });
 
 //Send message (enter key or button click)
@@ -35,7 +32,7 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-function sendMessage() {
+async function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) {
         return;
@@ -43,7 +40,7 @@ function sendMessage() {
 
     messageInput.value = '';
     logEntry('user', 'you: ' + message);
-    setStatus('loading', 'Processing...');
+    setStatus('loading');
 
     // Send message to backend
     try {
@@ -83,15 +80,16 @@ function sendMessage() {
 
 //status indicator
 function setStatus(state) {
-    statusIndicator.className = 'status-indicator';
-
-    if (state === "connected") {
-        statusText.textContent = 'Connected';
-    } else if (state === "error") {
-        statusText.textContent = 'Error: ' + text;
-    } else { 
-        statusText.textContent = 'loading...';
-    }
+  statusIndicator.className = 'status-indicator';
+  if (state === 'connected') {
+    statusIndicator.classList.add('connected');
+    statusText.textContent = 'connected';
+  } else if (state === 'error') {
+    statusIndicator.classList.add('error');
+    statusText.textContent = 'error';
+  } else {
+    statusText.textContent = 'loading...';
+  }
 }
 
 // Logging-function 
@@ -99,7 +97,8 @@ function logEntry(sender, message) {
     const entry = document.createElement('div');
     entry.className = 'log-entry ' + sender;
     entry.textContent = `[${timestamp()}] ${message}`;
-    logElement.scrollTop = logElement.scrollHeight; // Auto-scroll to bottom
+    logElement.appendChild(entry);
+    logElement.scrollTop = logElement.scrollHeight;
 }
 
 function logSystem(message) {
