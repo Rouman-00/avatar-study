@@ -9,11 +9,11 @@ async function initAvatar() {
   const container = document.getElementById('avatar');
 
   head = new TalkingHead(container, {
-    //ttsEndpoint: 'http://127.0.0.1:8000/tts',
+    ttsEndpoint: 'http://127.0.0.1:8000/tts',
     //ttsAPIKey: "...",
     //cameraView: "upper",
-    //ttsLang: 'de-DE',
-    //ttsVoice: 'de-DE-Standard-A',
+    ttsLang: 'de-DE',
+    ttsVoice: 'de-DE-Standard-A',
     lipsyncModules: ['en', 'de'],
   });
 
