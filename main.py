@@ -1,14 +1,24 @@
-import re
+import mimetypes
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncio
-import edge_tts
 import base64
 
+# Windows/Python often has no entry for .mjs and StaticFiles falls back to
+# text/plain, which browsers refuse to load as an ES module (blocks all
+# TalkingHead imports with no console error).
+mimetypes.add_type('text/javascript', '.mjs')
+
+# v1beta1 is required here: SSML <mark> timepointing (enable_time_pointing /
+# response.timepoints) is not exposed by the stable v1 client.
+from google.cloud import texttospeech_v1beta1 as texttospeech
+
 app = FastAPI()
+
+tts_client = texttospeech.TextToSpeechClient()
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,7 +43,7 @@ def chat(user_input: UserInput):
     if not message:
         return ({'error': 'Leere Nachricht'}), 400
 
-    response_text, emotion = 'Hallo, ich bin ein Avatar mit Lippensynchronisation. Meine Mundbewegungen orientieren sich dabei an der Spracheingabe, sodass der Eindruck entsteht, ich würde tatsächlich sprechen.', 'neutral'
+    response_text, emotion = 'Hello, i am a talking avatar with lip synchronization. My mouth movements are based on the speech input, creating the impression that I am actually speaking.', 'neutral'
 
     return ({
         'response': response_text,
@@ -45,31 +55,32 @@ def chat(user_input: UserInput):
 async def tts(request: Request):
     data = await request.json()
     ssml = data.get('input', {}).get('ssml', '')
-    voice_name = data.get('voice', {}).get('name', 'de-DE-Standard-A')
-    plain_text = re.sub(r'<[^>]+>', ' ', ssml)
-    plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+    voice_name = data.get('voice', {}).get('name', 'en-US-Neural2-A')
+    language_code = data.get('voice', {}).get('languageCode', 'en-US')
 
-    if not plain_text:
+    if not ssml.strip():
         return {'error': 'Kein Text'}, 400
 
-    marks = re.findall(r'<mark name="(\d+)"', ssml)
-    print(f"SSML: {ssml}")
-    communicate = edge_tts.Communicate(plain_text, voice='de-DE-ConradNeural')
-    audio_data = b''
-    word_times = []
-    async for chunk in communicate.stream():
-        if chunk['type'] == 'audio':
-            audio_data += chunk['data']
-        elif chunk['type'] == 'WordBoundary':
-            word_times.append(chunk['offset'] / 10_000_000)
+    synth_request = texttospeech.SynthesizeSpeechRequest(
+        input=texttospeech.SynthesisInput(ssml=ssml),
+        voice=texttospeech.VoiceSelectionParams(
+            language_code=language_code,
+            name=voice_name,
+        ),
+        audio_config=texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3,
+        ),
+        # Ask Google to time the <mark> tags TalkingHead put into the SSML.
+        enable_time_pointing=[texttospeech.SynthesizeSpeechRequest.TimepointType.SSML_MARK],
+    )
 
-    audio_content = base64.b64encode(audio_data).decode('utf-8')
+    # synthesize_speech is a blocking gRPC call; run it off the event loop.
+    response = await asyncio.to_thread(tts_client.synthesize_speech, request=synth_request)
 
-    # Mark N → Startzeitpunkt von Wort N
+    audio_content = base64.b64encode(response.audio_content).decode('utf-8')
     timepoints = [
-        {'markName': mark_name, 'timeSeconds': round(word_times[i], 3)}
-        for i, mark_name in enumerate(marks)
-        if i < len(word_times)
+        {'markName': tp.mark_name, 'timeSeconds': round(tp.time_seconds, 3)}
+        for tp in response.timepoints
     ]
 
     return {'audioContent': audio_content, 'timepoints': timepoints}

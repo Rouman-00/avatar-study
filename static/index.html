@@ -13,12 +13,16 @@
   { "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js/+esm",
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
-    "talkinghead": "/TalkingHead/modules/talkinghead.mjs"
+    "talkinghead": "./TalkingHead/modules/talkinghead.mjs"
   }}
   </script>
 </head>
 <body>
   <div id="avatar"></div>
+  <script>
+    window.addEventListener('error', e => console.error('GLOBAL ERROR:', e.message, e.filename, e.lineno));
+    window.addEventListener('unhandledrejection', e => console.error('UNHANDLED REJECTION:', e.reason && e.reason.stack || e.reason));
+  </script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

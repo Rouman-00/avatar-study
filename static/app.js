@@ -1,8 +1,11 @@
 import { TalkingHead } from "talkinghead";
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let head = null;
-let animationMixer = null; 
-let currentAnimation = null; 
+let animationMixer = null;
+let currentAnimation = null;
+
 const channel = new BroadcastChannel('avatar-control');
 
 async function initAvatar() {
@@ -12,8 +15,8 @@ async function initAvatar() {
     ttsEndpoint: 'http://127.0.0.1:8000/tts',
     //ttsAPIKey: "...",
     //cameraView: "upper",
-    ttsLang: 'de-DE',
-    ttsVoice: 'de-DE-Standard-A',
+    ttsLang: 'en-US',
+    ttsVoice: 'en-US-Neural2-A',
     lipsyncModules: ['en', 'de'],
   });
 
@@ -21,13 +24,15 @@ async function initAvatar() {
   await head.showAvatar({
     url: 'TalkingHead/avatars/new-avatar.glb',
     body: 'M',
-    avatarMood: 'neutral',
+    avatarMood: 'happy',
     baseline: {
     headRotateX: -0.05,
     eyeBlinkLeft: 0.15,
     eyeBlinkRight: 0.15,
   }
   });
+
+  addSceneObjects();
 
   // load Animation (optional)
   await loadAnimations();
@@ -69,6 +74,14 @@ channel.addEventListener('message', async (event) => {
         head.setMood?.(payload.emotion || 'neutral');
       }
       console.log('[Avatar] Emotion:', payload.emotion);
+      break;
+
+    case 'open_door':
+      openDoor();
+      break;
+
+    case 'walk_to_door':
+      walkToDoor();
       break;
 
     case 'play_animation':

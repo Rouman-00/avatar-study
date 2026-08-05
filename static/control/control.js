@@ -10,6 +10,9 @@ const statusText = document.getElementById('status-text');
 const toggleLipsync = document.getElementById('toggle-lipsync');
 const toggleEmotion = document.getElementById('toggle-emotion');
 const toggleLLM = document.getElementById('toggle-llm');
+const voiceSelect = document.getElementById('voice-select');
+
+
 
 //Condition toggles send immediately their state to backend to the avatar
 toggleLipsync.addEventListener('change', () => {
@@ -68,7 +71,7 @@ async function sendMessage() {
         // broadcast response to avatar for speaking
         channel.postMessage({
             type: 'speak',
-            payload: { text: data.response, options: { emotion: data.emotion ?? 'neutral' } },
+            payload: { text: data.response, options: { emotion: data.emotion ?? 'neutral', ttsVoice: voiceSelect.value } },
         })
     }
     catch (error) {
