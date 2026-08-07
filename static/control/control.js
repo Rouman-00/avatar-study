@@ -28,20 +28,26 @@ toggleLLM.addEventListener('change', () => {
 });
 
 //Send message (enter key or button click)
-sendButton.addEventListener('click', sendMessage);
+sendButton.addEventListener('click', () => {
+    sendChatMessage(messageInput.value.trim());
+    messageInput.value = '';
+});
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        sendMessage();
+        sendChatMessage(messageInput.value.trim());
+        messageInput.value = '';
     }
 });
 
-async function sendMessage() {
-    const message = messageInput.value.trim();
+// Gemeinsamer Pfad fuer Tastatur- UND Voice-Eingabe: beide sollen im selben
+// Dialog-Log erscheinen und denselben /chat-Aufruf (inkl. speak-Broadcast an
+// den Avatar) durchlaufen, damit die Antwort in beiden Faellen auch
+// gesprochen wird.
+async function sendChatMessage(message) {
     if (!message) {
         return;
     }
 
-    messageInput.value = '';
     logEntry('user', 'you: ' + message);
     setStatus('loading');
 
@@ -124,3 +130,102 @@ async function checkConnection() {
 }
 
 checkConnection();
+
+
+//####### Audio #######
+
+const recordBtn = document.getElementById("recordBtn");
+const audioFileInput = document.getElementById("audioFileInput");
+const gpuCheckbox = document.getElementById("gpuCheckbox");
+const audioStatusEl = document.getElementById("audio-status");
+
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+
+// Eigener Name noetig: setStatus(state) oben wird fuer den
+// Verbindungsindikator gebraucht und darf hier nicht ueberschrieben werden.
+function setAudioStatus(text) {
+  audioStatusEl.textContent = text;
+}
+
+async function startRecording() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  mediaRecorder = new MediaRecorder(stream);
+  audioChunks = [];
+
+  mediaRecorder.addEventListener("dataavailable", (event) => {
+    if (event.data.size > 0) {
+      audioChunks.push(event.data);
+    }
+  });
+
+  mediaRecorder.addEventListener("stop", () => {
+    stream.getTracks().forEach((track) => track.stop());
+    const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+    processAudioBlob(audioBlob, "recording.webm");
+  });
+
+  mediaRecorder.start();
+  isRecording = true;
+  recordBtn.textContent = "Aufnahme stoppen";
+  setAudioStatus("Aufnahme läuft...");
+}
+
+function stopRecording() {
+  if (mediaRecorder && isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    recordBtn.textContent = "Aufnahme starten";
+  }
+}
+
+async function processAudioBlob(audioBlob, filename) {
+  try {
+    setAudioStatus("Transkribiere...");
+    const text = await transcribeAudio(audioBlob, filename);
+
+    if (!text) {
+      setAudioStatus("Kein Text erkannt.");
+      return;
+    }
+
+    setAudioStatus("");
+    await sendChatMessage(text);
+  } catch (err) {
+    setAudioStatus(`Fehler: ${err.message}`);
+  }
+}
+
+async function transcribeAudio(audioBlob, filename) {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, filename);
+  formData.append("device", gpuCheckbox.checked ? "cuda" : "cpu");
+
+  const response = await fetch(API_URL + "/api/transcribe", {
+    method: "POST",
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || data.detail || "Transkription fehlgeschlagen.");
+  }
+  return data.text;
+}
+
+recordBtn.addEventListener("click", () => {
+  if (isRecording) {
+    stopRecording();
+  } else {
+    startRecording().catch((err) => setAudioStatus(`Fehler: ${err.message}`));
+  }
+});
+
+audioFileInput.addEventListener("change", () => {
+  const file = audioFileInput.files[0];
+  if (!file) {
+    return;
+  }
+  processAudioBlob(file, file.name);
+  audioFileInput.value = "";
+});

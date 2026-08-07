@@ -19,12 +19,17 @@
             <label><input type="checkbox" id="toggle-lipsync" checked /> LipSync</label>
             <label><input type="checkbox" id="toggle-emotion" checked /> Emotion</label>
             <label><input type="checkbox" id="toggle-llm" checked /> LLM-Modus</label>
+            <label class="gpu-toggle">
+                <input type="checkbox" id="gpuCheckbox" />
+                GPU (CUDA) für Spracherkennung verwenden
+            </label>
             <label>Voice:
                 <select id="voice-select">
                     <option value="en-US-Neural2-A">en-US-Neural2-A</option>
                     <option value="en-US-Wavenet-A">en-US-Wavenet-A</option>
                     <option value="en-US-Standard-A">en-US-Standard-A</option>
                     <option value="en-US-Standard-B">en-US-Wavenet-B</option>
+                    <option value="en-US-Neural2-D">en-US-Neural2-D</option>
                 </select>
             </label>
             </div>
@@ -34,12 +39,16 @@
         <div class="section">
             <h2>Nachricht senden</h2>
             <div id="input-area">
-            <input type="text" id="message-input" placeholder="Message Input..." />
-            <button id="send-button">Send</button>
+                <input type="text" id="message-input" placeholder="Message Input..." />
+                <button id="send-button">Send</button>
+                <button id="recordBtn" type="button">Aufnahme starten</button>
+                <label class="file-upload">
+                    Audiodatei hochladen (.wav)
+                    <input type="file" id="audioFileInput" accept=".wav,audio/wav" />
+                </label>
             </div>
+            <p id="audio-status" class="status"></p>
         </div>
-
-    
 
         <!-- Log -->
         <div class="section">

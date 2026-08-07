@@ -25,3 +25,12 @@ button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; f
                     border-radius: 50%; background: #ccc; margin-right: 6px; }
 #status-indicator.connected { background: #4caf50; }
 #status-indicator.error { background: #f44336; }
+
+.gpu-toggle,
+.file-upload { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.file-upload input[type="file"] { font-size: 0.85rem; }
+
+#recordBtn { background: #4a90e2; color: white; }
+#recordBtn:hover { background: #3a7bd5; }
+
+.status { min-height: 1.2em; margin: 8px 0 0; font-style: italic; color: #666; font-size: 0.9rem; }
