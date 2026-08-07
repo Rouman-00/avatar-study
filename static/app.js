@@ -7,6 +7,13 @@ let animationMixer = null;
 let currentAnimation = null;
 
 const channel = new BroadcastChannel('avatar-control');
+const API_URL = 'http://127.0.0.1:8000';
+
+// Einstellungen aus control.html (per BroadcastChannel synchronisiert), z.B.
+// fuer die Sprachaufnahme-Buttons hier auf der Avatar-Seite.
+let currentTtsVoice = 'en-US-Neural2-A';
+let currentSttDevice = 'cpu';
+let currentUseLLM = true;
 
 async function initAvatar() {
   const container = document.getElementById('avatar');
@@ -90,6 +97,21 @@ channel.addEventListener('message', async (event) => {
       }
       break;
 
+    case 'set_llm':
+      currentUseLLM = !!payload.enabled;
+      console.log('[Avatar] LLM-Modus:', currentUseLLM);
+      break;
+
+    case 'set_voice':
+      currentTtsVoice = payload.voice;
+      console.log('[Avatar] TTS-Stimme:', currentTtsVoice);
+      break;
+
+    case 'set_device':
+      currentSttDevice = payload.device;
+      console.log('[Avatar] STT-Device:', currentSttDevice);
+      break;
+
     default:
       console.warn('[Avatar] Unknown message type:', type);
   }
@@ -97,6 +119,8 @@ channel.addEventListener('message', async (event) => {
 
 async function speak(text, options = {}) {
   if (!text || !head) return;
+
+  setLastResponseText(text);
 
   try {
     // Emotion setzen, falls vorhanden
@@ -124,3 +148,145 @@ function playAnimation(name) {
 
 
 initAvatar();
+
+
+//####### Antwort-Panel (letzte AI-Nachricht) #######
+
+const responsePanel = document.getElementById('response-panel');
+const responseToggle = document.getElementById('response-toggle');
+const responseText = document.getElementById('response-text');
+
+responseToggle.addEventListener('click', () => {
+  const expanded = responsePanel.classList.toggle('expanded');
+  responseToggle.setAttribute('aria-expanded', String(expanded));
+});
+
+function setLastResponseText(text) {
+  responseText.textContent = text;
+}
+
+
+//####### Voice-Aufnahme (Kunden-UI) #######
+
+const micBtn = document.getElementById('mic-btn');
+const recordingActions = document.getElementById('recording-actions');
+const cancelBtn = document.getElementById('cancel-btn');
+const sendBtn = document.getElementById('send-btn');
+const voiceStatusEl = document.getElementById('voice-status');
+
+let voiceRecorder = null;
+let voiceChunks = [];
+let voiceCancelled = false;
+
+function setVoiceStatus(text) {
+  voiceStatusEl.textContent = text || '';
+}
+
+function showRecordingUI(recording) {
+  micBtn.classList.toggle('recording', recording);
+  micBtn.style.visibility = recording ? 'hidden' : 'visible';
+  recordingActions.classList.toggle('visible', recording);
+}
+
+async function startVoiceRecording() {
+  voiceCancelled = false;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  voiceRecorder = new MediaRecorder(stream);
+  voiceChunks = [];
+
+  voiceRecorder.addEventListener('dataavailable', (event) => {
+    if (event.data.size > 0) {
+      voiceChunks.push(event.data);
+    }
+  });
+
+  voiceRecorder.addEventListener('stop', () => {
+    stream.getTracks().forEach((track) => track.stop());
+    if (voiceCancelled) {
+      voiceChunks = [];
+      return;
+    }
+    const audioBlob = new Blob(voiceChunks, { type: 'audio/webm' });
+    handleVoiceRecording(audioBlob);
+  });
+
+  voiceRecorder.start();
+  showRecordingUI(true);
+  setVoiceStatus('Aufnahme läuft...');
+}
+
+function cancelVoiceRecording() {
+  voiceCancelled = true;
+  if (voiceRecorder && voiceRecorder.state !== 'inactive') {
+    voiceRecorder.stop();
+  }
+  showRecordingUI(false);
+  setVoiceStatus('');
+}
+
+function sendVoiceRecording() {
+  if (!voiceRecorder || voiceRecorder.state === 'inactive') {
+    return;
+  }
+  voiceCancelled = false;
+  showRecordingUI(false);
+  voiceRecorder.stop();
+}
+
+async function handleVoiceRecording(audioBlob) {
+  try {
+    setVoiceStatus('Transcribe...');
+    const text = await transcribeVoiceAudio(audioBlob);
+
+    if (!text) {
+      setVoiceStatus('Kein Text erkannt.');
+      return;
+    }
+
+    setVoiceStatus('');
+    await sendVoiceMessage(text);
+  } catch (err) {
+    setVoiceStatus(`Fehler: ${err.message}`);
+  }
+}
+
+async function transcribeVoiceAudio(audioBlob) {
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'recording.webm');
+  formData.append('device', currentSttDevice);
+
+  const response = await fetch(API_URL + '/api/transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || data.detail || 'Transkription fehlgeschlagen.');
+  }
+  return data.text;
+}
+
+async function sendVoiceMessage(message) {
+  const response = await fetch(API_URL + '/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, use_llm: currentUseLLM }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Server error: ' + response.status);
+  }
+
+  const data = await response.json();
+  await speak(data.response, { emotion: data.emotion ?? 'neutral', ttsVoice: currentTtsVoice });
+}
+
+micBtn.addEventListener('click', () => {
+  startVoiceRecording().catch((err) => {
+    setVoiceStatus(`Fehler: ${err.message}`);
+    showRecordingUI(false);
+  });
+});
+
+cancelBtn.addEventListener('click', cancelVoiceRecording);
+sendBtn.addEventListener('click', sendVoiceRecording);

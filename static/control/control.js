@@ -27,6 +27,10 @@ toggleLLM.addEventListener('change', () => {
     channel.postMessage({ type: 'set_llm', payload: { enabled: toggleLLM.checked } });
 });
 
+voiceSelect.addEventListener('change', () => {
+    channel.postMessage({ type: 'set_voice', payload: { voice: voiceSelect.value } });
+});
+
 //Send message (enter key or button click)
 sendButton.addEventListener('click', () => {
     sendChatMessage(messageInput.value.trim());
@@ -138,6 +142,10 @@ const recordBtn = document.getElementById("recordBtn");
 const audioFileInput = document.getElementById("audioFileInput");
 const gpuCheckbox = document.getElementById("gpuCheckbox");
 const audioStatusEl = document.getElementById("audio-status");
+
+gpuCheckbox.addEventListener("change", () => {
+    channel.postMessage({ type: 'set_device', payload: { device: gpuCheckbox.checked ? 'cuda' : 'cpu' } });
+});
 
 let mediaRecorder = null;
 let audioChunks = [];
