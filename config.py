@@ -10,7 +10,9 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
-WHISPER_MODEL_ID = "Systran/faster-whisper-medium"
+WHISPER_MODEL_MEDIUM = "Systran/faster-whisper-medium"
+WHISPER_MODEL_SMALL = "Systran/faster-whisper-small"
+WHISPER_MODEL_ID = WHISPER_MODEL_MEDIUM  # Default-Modell, wird beim Start vorgeladen
 LLM_MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
 
 # --- CUDA-Setup (nur Windows) REMINDER-------------------------------------------

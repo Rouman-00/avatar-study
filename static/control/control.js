@@ -31,6 +31,24 @@ voiceSelect.addEventListener('change', () => {
     channel.postMessage({ type: 'set_voice', payload: { voice: voiceSelect.value } });
 });
 
+const modelSelect = document.getElementById('model-select');
+const beamSizeRange = document.getElementById('beam-size-range');
+const beamSizeValueEl = document.getElementById('beam-size-value');
+const vadFilterCheckbox = document.getElementById('vad-filter-checkbox');
+
+modelSelect.addEventListener('change', () => {
+    channel.postMessage({ type: 'set_model', payload: { model: modelSelect.value } });
+});
+
+beamSizeRange.addEventListener('input', () => {
+    beamSizeValueEl.textContent = beamSizeRange.value;
+    channel.postMessage({ type: 'set_beam_size', payload: { beamSize: Number(beamSizeRange.value) } });
+});
+
+vadFilterCheckbox.addEventListener('change', () => {
+    channel.postMessage({ type: 'set_vad_filter', payload: { enabled: vadFilterCheckbox.checked } });
+});
+
 //Send message (enter key or button click)
 sendButton.addEventListener('click', () => {
     sendChatMessage(messageInput.value.trim());
@@ -209,6 +227,9 @@ async function transcribeAudio(audioBlob, filename) {
   const formData = new FormData();
   formData.append("audio", audioBlob, filename);
   formData.append("device", gpuCheckbox.checked ? "cuda" : "cpu");
+  formData.append("model_size", modelSelect.value);
+  formData.append("beam_size", beamSizeRange.value);
+  formData.append("vad_filter", vadFilterCheckbox.checked);
 
   const response = await fetch(API_URL + "/api/transcribe", {
     method: "POST",

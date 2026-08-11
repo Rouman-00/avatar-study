@@ -34,6 +34,13 @@ async def health():
     return {"status": "ok"}
 
 
+@app.on_event("startup")
+async def preload_stt_model():
+    # Vermeidet, dass der erste Transkriptions-Request die ~7s Ladezeit des
+    # Whisper-Modells (medium, CPU) live mit abbekommt.
+    await asyncio.to_thread(stt.get_whisper_model, "cpu", "medium")
+
+
 class UserInput(BaseModel):
     message: str
     use_llm: bool = True
@@ -57,11 +64,24 @@ async def chat(user_input: UserInput):
 
 
 @app.post('/api/transcribe')
-async def transcribe(audio: UploadFile = File(...), device: str = Form("cpu")):
+async def transcribe(
+    audio: UploadFile = File(...),
+    device: str = Form("cpu"),
+    model_size: str = Form("medium"),
+    beam_size: int = Form(5),
+    vad_filter: bool = Form(False),
+):
     if device not in ("cpu", "cuda"):
         device = "cpu"
+    if model_size not in stt.WHISPER_MODELS:
+        model_size = "medium"
+    beam_size = max(1, min(10, beam_size))
 
-    print(f"[api] /api/transcribe: device={device}, filename={audio.filename}", flush=True)
+    print(
+        f"[api] /api/transcribe: device={device}, model_size={model_size}, beam_size={beam_size}, "
+        f"vad_filter={vad_filter}, filename={audio.filename}",
+        flush=True,
+    )
 
     suffix = os.path.splitext(audio.filename or "")[1] or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -69,7 +89,9 @@ async def transcribe(audio: UploadFile = File(...), device: str = Form("cpu")):
         tmp_path = tmp.name
 
     try:
-        text = await asyncio.to_thread(stt.transcribe_file, device, tmp_path)
+        text = await asyncio.to_thread(
+            stt.transcribe_file, device, tmp_path, model_size, beam_size, vad_filter
+        )
         return {'text': text}
     except Exception as exc:
         raise HTTPException(

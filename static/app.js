@@ -14,6 +14,9 @@ const API_URL = 'http://127.0.0.1:8000';
 let currentTtsVoice = 'en-US-Neural2-A';
 let currentSttDevice = 'cpu';
 let currentUseLLM = true;
+let currentSttModel = 'medium';
+let currentBeamSize = 5;
+let currentVadFilter = false;
 
 async function initAvatar() {
   const container = document.getElementById('avatar');
@@ -110,6 +113,21 @@ channel.addEventListener('message', async (event) => {
     case 'set_device':
       currentSttDevice = payload.device;
       console.log('[Avatar] STT-Device:', currentSttDevice);
+      break;
+
+    case 'set_model':
+      currentSttModel = payload.model;
+      console.log('[Avatar] STT-Modell:', currentSttModel);
+      break;
+
+    case 'set_beam_size':
+      currentBeamSize = payload.beamSize;
+      console.log('[Avatar] Beam Size:', currentBeamSize);
+      break;
+
+    case 'set_vad_filter':
+      currentVadFilter = !!payload.enabled;
+      console.log('[Avatar] VAD-Filter:', currentVadFilter);
       break;
 
     default:
@@ -254,6 +272,9 @@ async function transcribeVoiceAudio(audioBlob) {
   const formData = new FormData();
   formData.append('audio', audioBlob, 'recording.webm');
   formData.append('device', currentSttDevice);
+  formData.append('model_size', currentSttModel);
+  formData.append('beam_size', currentBeamSize);
+  formData.append('vad_filter', currentVadFilter);
 
   const response = await fetch(API_URL + '/api/transcribe', {
     method: 'POST',

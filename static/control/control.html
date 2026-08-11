@@ -32,6 +32,16 @@
                     <option value="en-US-Neural2-D">en-US-Neural2-D</option>
                 </select>
             </label>
+            <label>Whisper-Modell:
+                <select id="model-select">
+                    <option value="medium" selected>medium (Standard)</option>
+                    <option value="small">small (schneller)</option>
+                </select>
+            </label>
+            <label>Beam Size: <span id="beam-size-value">5</span>
+                <input type="range" id="beam-size-range" min="1" max="5" value="5" />
+            </label>
+            <label><input type="checkbox" id="vad-filter-checkbox" /> VAD-Filter (Stille überspringen)</label>
             </div>
         </div>
 
