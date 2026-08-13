@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import config  # noqa: F401 -- muss zuerst importiert werden (env/CUDA-Setup)
+import interview
 import llm
 import stt
 import tts
@@ -27,6 +28,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(interview.router)
 
 
 @app.get("/health")
@@ -52,6 +55,11 @@ async def chat(user_input: UserInput):
 
     if not message:
         raise HTTPException(status_code=400, detail="Leere Nachricht")
+
+    if not user_input.use_llm:
+        raise HTTPException(
+            status_code=400, detail="LLM-Modus ist deaktiviert. Bitte im Control-Panel aktivieren."
+        )
 
     try:
         response_text = await llm.generate_reply(message)

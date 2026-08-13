@@ -37,6 +37,15 @@
     .voice-btn:hover { transform: scale(1.06); }
     .voice-btn:active { transform: scale(0.96); }
     .voice-btn svg { width: 28px; height: 28px; }
+    .voice-btn:disabled,
+    .voice-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .voice-btn:disabled:hover,
+    .voice-btn.disabled:hover {
+      transform: none;
+    }
 
     #mic-btn {
       background: linear-gradient(145deg, #4f8bff, #2f5fd6);
@@ -159,7 +168,7 @@
   </div>
 
   <div id="voice-ui">
-    <button id="mic-btn" class="voice-btn" type="button" title="Sprachaufnahme starten" aria-label="Sprachaufnahme starten">
+    <button id="mic-btn" class="voice-btn" type="button" title="Sprachaufnahme starten" aria-label="Sprachaufnahme starten" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>

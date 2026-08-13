@@ -18,7 +18,7 @@
             <div class="toggle-row">
             <label><input type="checkbox" id="toggle-lipsync" checked /> LipSync</label>
             <label><input type="checkbox" id="toggle-emotion" checked /> Emotion</label>
-            <label><input type="checkbox" id="toggle-llm" checked /> LLM-Modus</label>
+            <label><input type="checkbox" id="toggle-llm" /> LLM-Modus (freier Chatbot zum Ausprobieren)</label>
             <label class="gpu-toggle">
                 <input type="checkbox" id="gpuCheckbox" />
                 GPU (CUDA) für Spracherkennung verwenden
@@ -43,6 +43,13 @@
             </label>
             <label><input type="checkbox" id="vad-filter-checkbox" /> VAD-Filter (Stille überspringen)</label>
             </div>
+        </div>
+
+        <!-- Interview -->
+        <div class="section">
+            <h2>Interview</h2>
+            <button id="interview-start-button" type="button">Interview starten</button>
+            <p id="interview-status" class="status">nicht gestartet</p>
         </div>
 
         <!-- Eingabe -->

@@ -13,10 +13,13 @@ const API_URL = 'http://127.0.0.1:8000';
 // fuer die Sprachaufnahme-Buttons hier auf der Avatar-Seite.
 let currentTtsVoice = 'en-US-Neural2-A';
 let currentSttDevice = 'cpu';
-let currentUseLLM = true;
 let currentSttModel = 'medium';
 let currentBeamSize = 5;
 let currentVadFilter = false;
+
+// Aktuell laufende Interview-Session (null = kein Interview aktiv). Wird
+// gesetzt, sobald control.html per 'interview_start' ein Interview startet.
+let interviewSessionId = null;
 
 async function initAvatar() {
   const container = document.getElementById('avatar');
@@ -100,9 +103,8 @@ channel.addEventListener('message', async (event) => {
       }
       break;
 
-    case 'set_llm':
-      currentUseLLM = !!payload.enabled;
-      console.log('[Avatar] LLM-Modus:', currentUseLLM);
+    case 'interview_start':
+      await runInterviewStart(payload.sessionId, payload.text);
       break;
 
     case 'set_voice':
@@ -148,14 +150,32 @@ async function speak(text, options = {}) {
 
     // Avatar spricht mit Lippensync
     head.speakText(text, options);
-
     console.log('[Avatar] Spricht:', text);
+
+    // head.speakText() kehrt sofort zurueck (Sprache wird ueber eine interne
+    // Queue abgespielt) -- hier warten wir, bis head.isSpeaking wieder false
+    // ist, damit Aufrufer (z.B. das Interview) wissen, wann der Avatar
+    // wirklich fertig gesprochen hat.
+    await waitUntilDoneSpeaking();
   } catch (err) {
     console.error('[Avatar] Fehler beim Sprechen:', err);
   }
 
   // Fertig-Signal an Steuerung
   channel.postMessage({ type: 'speak_done' });
+}
+
+function waitUntilDoneSpeaking() {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (!head || !head.isSpeaking) {
+        resolve();
+      } else {
+        setTimeout(check, 150);
+      }
+    };
+    check();
+  });
 }
 
 function playAnimation(name) {
@@ -184,7 +204,7 @@ function setLastResponseText(text) {
 }
 
 
-//####### Voice-Aufnahme (Kunden-UI) #######
+//####### Voice-Aufnahme (Interview-Antworten, Kunden-UI) #######
 
 const micBtn = document.getElementById('mic-btn');
 const recordingActions = document.getElementById('recording-actions');
@@ -204,6 +224,29 @@ function showRecordingUI(recording) {
   micBtn.classList.toggle('recording', recording);
   micBtn.style.visibility = recording ? 'hidden' : 'visible';
   recordingActions.classList.toggle('visible', recording);
+}
+
+// Der Mic-Button darf nur geklickt werden, waehrend ein Interview laeuft UND
+// der Avatar gerade nicht spricht bzw. eine vorherige Antwort verarbeitet.
+const MIC_STATUS_TEXT = {
+  'no-interview': 'Kein Interview aktiv.',
+  speaking: 'Der Avatar spricht...',
+  processing: 'Verarbeite deine Antwort...',
+  ready: 'Bereit fuer deine Antwort.',
+};
+
+function setMicState(state) {
+  const enabled = state === 'ready';
+  micBtn.disabled = !enabled;
+  micBtn.classList.toggle('disabled', !enabled);
+  setVoiceStatus(MIC_STATUS_TEXT[state]);
+}
+
+async function runInterviewStart(sessionId, text) {
+  interviewSessionId = sessionId;
+  setMicState('speaking');
+  await speak(text, { ttsVoice: currentTtsVoice });
+  setMicState('ready');
 }
 
 async function startVoiceRecording() {
@@ -230,7 +273,6 @@ async function startVoiceRecording() {
 
   voiceRecorder.start();
   showRecordingUI(true);
-  setVoiceStatus('Aufnahme läuft...');
 }
 
 function cancelVoiceRecording() {
@@ -239,7 +281,7 @@ function cancelVoiceRecording() {
     voiceRecorder.stop();
   }
   showRecordingUI(false);
-  setVoiceStatus('');
+  setMicState('ready');
 }
 
 function sendVoiceRecording() {
@@ -248,22 +290,24 @@ function sendVoiceRecording() {
   }
   voiceCancelled = false;
   showRecordingUI(false);
+  setMicState('processing');
   voiceRecorder.stop();
 }
 
 async function handleVoiceRecording(audioBlob) {
   try {
-    setVoiceStatus('Transcribe...');
     const text = await transcribeVoiceAudio(audioBlob);
 
     if (!text) {
+      setMicState('ready');
       setVoiceStatus('Kein Text erkannt.');
       return;
     }
 
-    setVoiceStatus('');
-    await sendVoiceMessage(text);
+    channel.postMessage({ type: 'interview_answer_received', payload: { text } });
+    await submitInterviewAnswer(text);
   } catch (err) {
+    setMicState('ready');
     setVoiceStatus(`Fehler: ${err.message}`);
   }
 }
@@ -287,27 +331,38 @@ async function transcribeVoiceAudio(audioBlob) {
   return data.text;
 }
 
-async function sendVoiceMessage(message) {
-  const response = await fetch(API_URL + '/chat', {
+async function submitInterviewAnswer(message) {
+  const response = await fetch(API_URL + '/interview/answer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, use_llm: currentUseLLM }),
+    body: JSON.stringify({ session_id: interviewSessionId, message }),
   });
 
+  const data = await response.json();
   if (!response.ok) {
-    throw new Error('Server error: ' + response.status);
+    throw new Error(data.detail || 'Server error: ' + response.status);
   }
 
-  const data = await response.json();
-  await speak(data.response, { emotion: data.emotion ?? 'neutral', ttsVoice: currentTtsVoice });
+  channel.postMessage({ type: 'interview_update', payload: { text: data.text, done: data.done } });
+
+  setMicState('speaking');
+  await speak(data.text, { ttsVoice: currentTtsVoice });
+
+  if (data.done) {
+    interviewSessionId = null;
+    setMicState('no-interview');
+  } else {
+    setMicState('ready');
+  }
 }
 
 micBtn.addEventListener('click', () => {
   startVoiceRecording().catch((err) => {
     setVoiceStatus(`Fehler: ${err.message}`);
-    showRecordingUI(false);
   });
 });
 
 cancelBtn.addEventListener('click', cancelVoiceRecording);
 sendBtn.addEventListener('click', sendVoiceRecording);
+
+setMicState('no-interview');

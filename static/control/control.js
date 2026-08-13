@@ -23,10 +23,6 @@ toggleEmotion.addEventListener('change', () => {
     channel.postMessage({ type: 'set_emotion', payload: { enabled: toggleEmotion.checked } });
 });
 
-toggleLLM.addEventListener('change', () => {
-    channel.postMessage({ type: 'set_llm', payload: { enabled: toggleLLM.checked } });
-});
-
 voiceSelect.addEventListener('change', () => {
     channel.postMessage({ type: 'set_voice', payload: { voice: voiceSelect.value } });
 });
@@ -86,13 +82,14 @@ async function sendChatMessage(message) {
             }),
         });
 
-        // Check for HTTP errors
-        if (!response.ok) {
-            throw new Error('Server error: ' + response.status);
-        };
-
         // Parse JSON response
         const data = await response.json();
+
+        // Check for HTTP errors
+        if (!response.ok) {
+            throw new Error(data.detail || 'Server error: ' + response.status);
+        }
+
         logEntry('AI-Agent', 'AI-Agent: ' + data.response);
         setStatus('Response received');
 
@@ -141,7 +138,7 @@ function timestamp() {
   return new Date().toLocaleTimeString('de-DE', { hour12: false });
 }
 
-//check connection to backend 
+//check connection to backend
 async function checkConnection() {
   try {
     await fetch(API_URL + '/health');
@@ -152,6 +149,59 @@ async function checkConnection() {
 }
 
 checkConnection();
+
+
+//####### Interview #######
+
+const interviewStartButton = document.getElementById('interview-start-button');
+const interviewStatusEl = document.getElementById('interview-status');
+
+interviewStartButton.addEventListener('click', async () => {
+    interviewStartButton.disabled = true;
+    interviewStatusEl.textContent = 'wird gestartet...';
+
+    try {
+        const response = await fetch(API_URL + '/interview/start', { method: 'POST' });
+        if (!response.ok) {
+            throw new Error('Server error: ' + response.status);
+        }
+        const data = await response.json();
+
+        logEntry('AI-Agent', 'Interview: ' + data.text);
+        interviewStatusEl.textContent = 'läuft...';
+
+        channel.postMessage({
+            type: 'interview_start',
+            payload: { sessionId: data.session_id, text: data.text },
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        interviewStatusEl.textContent = 'Fehler: ' + error.message;
+        interviewStartButton.disabled = false;
+    }
+});
+
+// Fortschritt des laufenden Interviews (auf index.html gesteuert) hier nur
+// zur Beobachtung im Dialog-Log mitloggen.
+channel.addEventListener('message', (event) => {
+    const { type, payload } = event.data;
+
+    switch (type) {
+        case 'interview_answer_received':
+            logEntry('user', 'Teilnehmer: ' + payload.text);
+            break;
+
+        case 'interview_update':
+            logEntry('AI-Agent', 'Interview: ' + payload.text);
+            if (payload.done) {
+                interviewStatusEl.textContent = 'beendet';
+                interviewStartButton.disabled = false;
+            } else {
+                interviewStatusEl.textContent = 'läuft...';
+            }
+            break;
+    }
+});
 
 
 //####### Audio #######

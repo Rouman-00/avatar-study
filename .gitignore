@@ -13,6 +13,9 @@ build/
 .env
 .env.local
 
+# Interview participant data
+data/
+
 # OS
 .DS_Store
 Thumbs.db
