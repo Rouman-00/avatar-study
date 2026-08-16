@@ -1,6 +1,7 @@
 import { TalkingHead } from "talkinghead";
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { transcribeInBrowser } from './stt/whisper-web-client.js';
 
 let head = null;
 let animationMixer = null;
@@ -12,10 +13,19 @@ const API_URL = 'http://127.0.0.1:8000';
 // Einstellungen aus control.html (per BroadcastChannel synchronisiert), z.B.
 // fuer die Sprachaufnahme-Buttons hier auf der Avatar-Seite.
 let currentTtsVoice = 'en-US-Neural2-A';
+let currentSttEngine = 'server';
 let currentSttDevice = 'cpu';
 let currentSttModel = 'medium';
 let currentBeamSize = 5;
 let currentVadFilter = false;
+
+// whisper-web (Browser-STT via Transformers.js) Einstellungen, synchronisiert
+// aus control.html. Defaults spiegeln control.html.
+let currentWwModel = 'Xenova/whisper-tiny';
+let currentWwQuantized = true;
+let currentWwMultilingual = false;
+let currentWwLanguage = 'auto';
+let currentWwSubtask = 'transcribe';
 
 // Aktuell laufende Interview-Session (null = kein Interview aktiv). Wird
 // gesetzt, sobald control.html per 'interview_start' ein Interview startet.
@@ -130,6 +140,36 @@ channel.addEventListener('message', async (event) => {
     case 'set_vad_filter':
       currentVadFilter = !!payload.enabled;
       console.log('[Avatar] VAD-Filter:', currentVadFilter);
+      break;
+
+    case 'set_stt_engine':
+      currentSttEngine = payload.engine;
+      console.log('[Avatar] STT-Engine:', currentSttEngine);
+      break;
+
+    case 'set_ww_model':
+      currentWwModel = payload.model;
+      console.log('[Avatar] whisper-web Modell:', currentWwModel);
+      break;
+
+    case 'set_ww_quantized':
+      currentWwQuantized = !!payload.enabled;
+      console.log('[Avatar] whisper-web quantisiert:', currentWwQuantized);
+      break;
+
+    case 'set_ww_multilingual':
+      currentWwMultilingual = !!payload.enabled;
+      console.log('[Avatar] whisper-web mehrsprachig:', currentWwMultilingual);
+      break;
+
+    case 'set_ww_language':
+      currentWwLanguage = payload.language;
+      console.log('[Avatar] whisper-web Sprache:', currentWwLanguage);
+      break;
+
+    case 'set_ww_subtask':
+      currentWwSubtask = payload.subtask;
+      console.log('[Avatar] whisper-web Task:', currentWwSubtask);
       break;
 
     default:
@@ -313,6 +353,20 @@ async function handleVoiceRecording(audioBlob) {
 }
 
 async function transcribeVoiceAudio(audioBlob) {
+  if (currentSttEngine === 'whisper-web') {
+    return transcribeInBrowser(
+      audioBlob,
+      {
+        model: currentWwModel,
+        quantized: currentWwQuantized,
+        multilingual: currentWwMultilingual,
+        language: currentWwLanguage,
+        subtask: currentWwSubtask,
+      },
+      setVoiceStatus,
+    );
+  }
+
   const formData = new FormData();
   formData.append('audio', audioBlob, 'recording.webm');
   formData.append('device', currentSttDevice);

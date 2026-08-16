@@ -19,10 +19,6 @@
             <label><input type="checkbox" id="toggle-lipsync" checked /> LipSync</label>
             <label><input type="checkbox" id="toggle-emotion" checked /> Emotion</label>
             <label><input type="checkbox" id="toggle-llm" /> LLM-Modus (freier Chatbot zum Ausprobieren)</label>
-            <label class="gpu-toggle">
-                <input type="checkbox" id="gpuCheckbox" />
-                GPU (CUDA) für Spracherkennung verwenden
-            </label>
             <label>Voice:
                 <select id="voice-select">
                     <option value="en-US-Neural2-A">en-US-Neural2-A</option>
@@ -32,17 +28,58 @@
                     <option value="en-US-Neural2-D">en-US-Neural2-D</option>
                 </select>
             </label>
-            <label>Whisper-Modell:
-                <select id="model-select">
-                    <option value="medium" selected>medium (Standard)</option>
-                    <option value="small">small (schneller)</option>
-                </select>
-            </label>
-            <label>Beam Size: <span id="beam-size-value">5</span>
-                <input type="range" id="beam-size-range" min="1" max="5" value="5" />
-            </label>
-            <label><input type="checkbox" id="vad-filter-checkbox" /> VAD-Filter (Stille überspringen)</label>
             </div>
+        </div>
+
+        <!-- Spracherkennung (STT) -->
+        <div class="section">
+            <h2>Spracherkennung (STT)</h2>
+            <div class="toggle-row">
+                <label><input type="radio" name="stt-engine" id="stt-engine-server" value="server" checked /> Server (faster-whisper)</label>
+                <label><input type="radio" name="stt-engine" id="stt-engine-whisperweb" value="whisper-web" /> Browser (whisper-web)</label>
+            </div>
+
+            <!-- Einstellungen gelten nur fuer die Server-Engine (faster-whisper via /api/transcribe) -->
+            <div id="stt-server-settings" class="toggle-row">
+                <label class="gpu-toggle">
+                    <input type="checkbox" id="gpuCheckbox" />
+                    GPU (CUDA) für Spracherkennung verwenden
+                </label>
+                <label>Whisper-Modell:
+                    <select id="model-select">
+                        <option value="medium" selected>medium (Standard)</option>
+                        <option value="small">small (schneller)</option>
+                    </select>
+                </label>
+                <label>Beam Size: <span id="beam-size-value">5</span>
+                    <input type="range" id="beam-size-range" min="1" max="5" value="5" />
+                </label>
+                <label><input type="checkbox" id="vad-filter-checkbox" /> VAD-Filter (Stille überspringen)</label>
+            </div>
+
+            <!-- Einstellungen gelten nur fuer die Browser-Engine (whisper-web, Transformers.js im Browser) -->
+            <div id="stt-whisperweb-settings" class="toggle-row" hidden>
+                <label>Whisper-Web-Modell:
+                    <select id="ww-model-select">
+                        <option value="Xenova/whisper-tiny" selected>tiny (~75MB / ~41MB quantized)</option>
+                        <option value="Xenova/whisper-base">base (~145MB / ~77MB quantized)</option>
+                        <option value="Xenova/whisper-small">small (~484MB / ~249MB quantized)</option>
+                        <option value="distil-whisper/distil-medium.en">distil-medium.en, nur Englisch (~789MB / ~402MB quantized)</option>
+                    </select>
+                </label>
+                <label><input type="checkbox" id="ww-quantized-checkbox" checked /> Quantisiert (kleiner &amp; schneller)</label>
+                <label><input type="checkbox" id="ww-multilingual-checkbox" /> Mehrsprachig (Sprache wählbar + Übersetzungs-Modus)</label>
+                <label>Sprache:
+                    <select id="ww-language-select" disabled></select>
+                </label>
+                <label>Task:
+                    <select id="ww-subtask-select" disabled>
+                        <option value="transcribe" selected>Transcribe</option>
+                        <option value="translate">Translate (nach Englisch)</option>
+                    </select>
+                </label>
+            </div>
+            <p class="status">Hinweis: Beam Size, VAD-Filter und GPU/CUDA gibt es bei whisper-web (Browser) nicht &mdash; dort laufen stattdessen Modellwahl, Quantisierung, Mehrsprachigkeit, Sprache und Task/Übersetzung client-seitig, ohne Server-Anfrage.</p>
         </div>
 
         <!-- Interview -->
@@ -73,6 +110,6 @@
             <div id="log"></div>
         </div>
 
-        <script src="control.js"></script>
+        <script type="module" src="control.js"></script>
     </body>
 </html>

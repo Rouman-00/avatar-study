@@ -1,5 +1,8 @@
+import { transcribeInBrowser } from '../stt/whisper-web-client.js';
+import { LANGUAGES } from '../stt/whisper-web-constants.js';
+
 const channel = new BroadcastChannel('avatar-control');
-const API_URL = 'http://127.0.0.1:8000'; 
+const API_URL = 'http://127.0.0.1:8000';
 
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
@@ -44,6 +47,77 @@ beamSizeRange.addEventListener('input', () => {
 vadFilterCheckbox.addEventListener('change', () => {
     channel.postMessage({ type: 'set_vad_filter', payload: { enabled: vadFilterCheckbox.checked } });
 });
+
+//####### STT-Engine: Server (faster-whisper) vs. Browser (whisper-web) #######
+
+const sttServerSettings = document.getElementById('stt-server-settings');
+const sttWhisperWebSettings = document.getElementById('stt-whisperweb-settings');
+const wwModelSelect = document.getElementById('ww-model-select');
+const wwQuantizedCheckbox = document.getElementById('ww-quantized-checkbox');
+const wwMultilingualCheckbox = document.getElementById('ww-multilingual-checkbox');
+const wwLanguageSelect = document.getElementById('ww-language-select');
+const wwSubtaskSelect = document.getElementById('ww-subtask-select');
+
+let currentSttEngine = 'server';
+
+// "auto" = Whisper erkennt die Sprache selbst (kein language-Parameter an die Pipeline)
+const languageOption = document.createElement('option');
+languageOption.value = 'auto';
+languageOption.textContent = 'Auto-Erkennung';
+languageOption.selected = true;
+wwLanguageSelect.appendChild(languageOption);
+Object.entries(LANGUAGES).forEach(([code, name]) => {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    wwLanguageSelect.appendChild(option);
+});
+
+function setSttEngineUi(engine) {
+    sttServerSettings.hidden = engine !== 'server';
+    sttWhisperWebSettings.hidden = engine !== 'whisper-web';
+}
+
+document.querySelectorAll('input[name="stt-engine"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        currentSttEngine = radio.value;
+        setSttEngineUi(currentSttEngine);
+        channel.postMessage({ type: 'set_stt_engine', payload: { engine: currentSttEngine } });
+    });
+});
+
+wwModelSelect.addEventListener('change', () => {
+    channel.postMessage({ type: 'set_ww_model', payload: { model: wwModelSelect.value } });
+});
+
+wwQuantizedCheckbox.addEventListener('change', () => {
+    channel.postMessage({ type: 'set_ww_quantized', payload: { enabled: wwQuantizedCheckbox.checked } });
+});
+
+wwMultilingualCheckbox.addEventListener('change', () => {
+    wwLanguageSelect.disabled = !wwMultilingualCheckbox.checked;
+    wwSubtaskSelect.disabled = !wwMultilingualCheckbox.checked;
+    channel.postMessage({ type: 'set_ww_multilingual', payload: { enabled: wwMultilingualCheckbox.checked } });
+});
+
+wwLanguageSelect.addEventListener('change', () => {
+    channel.postMessage({ type: 'set_ww_language', payload: { language: wwLanguageSelect.value } });
+});
+
+wwSubtaskSelect.addEventListener('change', () => {
+    channel.postMessage({ type: 'set_ww_subtask', payload: { subtask: wwSubtaskSelect.value } });
+});
+
+function getWhisperWebSettings() {
+    return {
+        model: wwModelSelect.value,
+        quantized: wwQuantizedCheckbox.checked,
+        multilingual: wwMultilingualCheckbox.checked,
+        language: wwLanguageSelect.value,
+        subtask: wwSubtaskSelect.value,
+    };
+}
 
 //Send message (enter key or button click)
 sendButton.addEventListener('click', () => {
@@ -274,6 +348,10 @@ async function processAudioBlob(audioBlob, filename) {
 }
 
 async function transcribeAudio(audioBlob, filename) {
+  if (currentSttEngine === 'whisper-web') {
+    return transcribeInBrowser(audioBlob, getWhisperWebSettings(), setAudioStatus);
+  }
+
   const formData = new FormData();
   formData.append("audio", audioBlob, filename);
   formData.append("device", gpuCheckbox.checked ? "cuda" : "cpu");
