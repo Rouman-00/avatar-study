@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import config  # noqa: F401 -- muss zuerst importiert werden (env/CUDA-Setup)
+import db
 import interview
 import llm
 import stt
@@ -42,6 +43,11 @@ async def preload_stt_model():
     # Vermeidet, dass der erste Transkriptions-Request die ~7s Ladezeit des
     # Whisper-Modells (medium, CPU) live mit abbekommt.
     await asyncio.to_thread(stt.get_whisper_model, "cpu", "medium")
+
+
+@app.on_event("startup")
+async def init_database():
+    db.init_db()
 
 
 class UserInput(BaseModel):

@@ -10,6 +10,10 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
+# URL-Vorlage fuer die externe Umfrage (Godspeed/METI), z.B.
+# "https://survey.example.com/limesurvey/index.php/12345?participant_number={participant_number}".
+# Leer = Feature inaktiv (Survey-Tool/Aufbau steht noch nicht final fest).
+SURVEY_URL_TEMPLATE = os.environ.get("SURVEY_URL_TEMPLATE", "")
 WHISPER_MODEL_MEDIUM = "Systran/faster-whisper-medium"
 WHISPER_MODEL_SMALL = "Systran/faster-whisper-small"
 WHISPER_MODEL_ID = WHISPER_MODEL_MEDIUM  # Default-Modell, wird beim Start vorgeladen

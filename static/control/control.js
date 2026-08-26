@@ -121,15 +121,27 @@ function getWhisperWebSettings() {
 
 //Send message (enter key or button click)
 sendButton.addEventListener('click', () => {
-    sendChatMessage(messageInput.value.trim());
+    handleSendMessage(messageInput.value.trim());
     messageInput.value = '';
 });
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        sendChatMessage(messageInput.value.trim());
+        handleSendMessage(messageInput.value.trim());
         messageInput.value = '';
     }
 });
+
+// Laeuft gerade ein Interview, soll das Textfeld als Test-Fallback ohne
+// Mikro an /interview/answer gehen statt an den generischen /chat-Pfad
+// (der bei deaktiviertem LLM-Modus ablehnt und ohnehin nichts mit dem
+// Interview zu tun hat).
+function handleSendMessage(message) {
+    if (activeInterviewSessionId) {
+        submitInterviewAnswerFromControl(message);
+    } else {
+        sendChatMessage(message);
+    }
+}
 
 // Gemeinsamer Pfad fuer Tastatur- UND Voice-Eingabe: beide sollen im selben
 // Dialog-Log erscheinen und denselben /chat-Aufruf (inkl. speak-Broadcast an
@@ -229,18 +241,34 @@ checkConnection();
 
 const interviewStartButton = document.getElementById('interview-start-button');
 const interviewStatusEl = document.getElementById('interview-status');
+const participantNumberInput = document.getElementById('participant-number-input');
+
+// Gesetzt waehrend ein Interview laeuft (Session-ID des Backends); steuert
+// den Text-Fallback in handleSendMessage() oben.
+let activeInterviewSessionId = null;
 
 interviewStartButton.addEventListener('click', async () => {
+    const participantNumber = participantNumberInput.value.trim();
+    if (!participantNumber) {
+        interviewStatusEl.textContent = 'Fehler: Teilnehmernummer fehlt.';
+        return;
+    }
+
     interviewStartButton.disabled = true;
     interviewStatusEl.textContent = 'wird gestartet...';
 
     try {
-        const response = await fetch(API_URL + '/interview/start', { method: 'POST' });
-        if (!response.ok) {
-            throw new Error('Server error: ' + response.status);
-        }
+        const response = await fetch(API_URL + '/interview/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ participant_number: participantNumber }),
+        });
         const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || 'Server error: ' + response.status);
+        }
 
+        activeInterviewSessionId = data.session_id;
         logEntry('AI-Agent', 'Interview: ' + data.text);
         interviewStatusEl.textContent = 'läuft...';
 
@@ -255,8 +283,58 @@ interviewStartButton.addEventListener('click', async () => {
     }
 });
 
-// Fortschritt des laufenden Interviews (auf index.html gesteuert) hier nur
-// zur Beobachtung im Dialog-Log mitloggen.
+// Test-Fallback: Antwort per Textfeld statt Mikro einreichen, waehrend ein
+// Interview laeuft. Spiegelt submitInterviewAnswer() aus app.js, inkl.
+// speak-Broadcast, damit der Avatar (falls index.html offen ist) die
+// naechste Frage trotzdem spricht.
+async function submitInterviewAnswerFromControl(message) {
+    if (!message) {
+        return;
+    }
+
+    logEntry('user', 'you (Interview): ' + message);
+
+    try {
+        const response = await fetch(API_URL + '/interview/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: activeInterviewSessionId, message }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || 'Server error: ' + response.status);
+        }
+
+        // BroadcastChannel liefert nicht an den Sender selbst zurueck -- die
+        // eigene UI (Log/Status) hier direkt aktualisieren, nicht ueber den
+        // 'interview_update'-Listener unten (der ist fuer den Fall gedacht,
+        // dass app.js/index.html die Antwort per Mikro eingereicht hat).
+        logEntry('AI-Agent', 'Interview: ' + data.text);
+        if (data.survey_url) {
+            logEntry('system', 'Umfrage-Link: ' + data.survey_url);
+        }
+        if (data.done) {
+            activeInterviewSessionId = null;
+            interviewStatusEl.textContent = 'beendet';
+            interviewStartButton.disabled = false;
+        } else {
+            interviewStatusEl.textContent = 'läuft...';
+        }
+
+        // Nur fuer den Avatar bestimmt, damit er (falls index.html offen
+        // ist) die naechste Frage auch tatsaechlich spricht.
+        channel.postMessage({
+            type: 'speak',
+            payload: { text: data.text, options: { ttsVoice: voiceSelect.value } },
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        logEntry('system', 'Error: ' + error.message);
+    }
+}
+
+// Fortschritt des laufenden Interviews (kann von hier oder von index.html
+// per Mikro ausgeloest worden sein) hier im Dialog-Log mitloggen.
 channel.addEventListener('message', (event) => {
     const { type, payload } = event.data;
 
@@ -267,7 +345,11 @@ channel.addEventListener('message', (event) => {
 
         case 'interview_update':
             logEntry('AI-Agent', 'Interview: ' + payload.text);
+            if (payload.survey_url) {
+                logEntry('system', 'Umfrage-Link: ' + payload.survey_url);
+            }
             if (payload.done) {
+                activeInterviewSessionId = null;
                 interviewStatusEl.textContent = 'beendet';
                 interviewStartButton.disabled = false;
             } else {

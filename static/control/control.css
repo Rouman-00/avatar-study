@@ -7,6 +7,7 @@ h1 { margin-bottom: 16px; font-size: 1.2rem; }
 
 .toggle-row { display: flex; gap: 16px; flex-wrap: wrap; }
 .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.toggle-row[hidden] { display: none; }
 
 #input-area { display: flex; gap: 8px; }
 #message-input { flex: 1; padding: 8px; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }

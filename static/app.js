@@ -45,7 +45,7 @@ async function initAvatar() {
 
   // laod Avatar
   await head.showAvatar({
-    url: 'TalkingHead/avatars/new-avatar.glb',
+    url: 'TalkingHead/avatars/male(Clone).glb',
     body: 'M',
     avatarMood: 'happy',
     baseline: {
@@ -54,8 +54,6 @@ async function initAvatar() {
     eyeBlinkRight: 0.15,
   }
   });
-
-  addSceneObjects();
 
   // load Animation (optional)
   await loadAnimations();
@@ -97,14 +95,6 @@ channel.addEventListener('message', async (event) => {
         head.setMood?.(payload.emotion || 'neutral');
       }
       console.log('[Avatar] Emotion:', payload.emotion);
-      break;
-
-    case 'open_door':
-      openDoor();
-      break;
-
-    case 'walk_to_door':
-      walkToDoor();
       break;
 
     case 'play_animation':
@@ -397,7 +387,10 @@ async function submitInterviewAnswer(message) {
     throw new Error(data.detail || 'Server error: ' + response.status);
   }
 
-  channel.postMessage({ type: 'interview_update', payload: { text: data.text, done: data.done } });
+  channel.postMessage({
+    type: 'interview_update',
+    payload: { text: data.text, done: data.done, survey_url: data.survey_url },
+  });
 
   setMicState('speaking');
   await speak(data.text, { ttsVoice: currentTtsVoice });
