@@ -45,7 +45,7 @@ async function initAvatar() {
 
   // laod Avatar
   await head.showAvatar({
-    url: 'TalkingHead/avatars/male(Clone).glb',
+    url: 'TalkingHead/avatars/model.glb',
     body: 'M',
     avatarMood: 'happy',
     baseline: {

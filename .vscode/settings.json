@@ -4,6 +4,10 @@
     ".vscode/**",
     "**/*.scss",
     "**/*.map",
-    "data/**"
+    "**/data/**",
+    "**/*.db",
+    "**/*.db-journal",
+    "**/*.db-wal",
+    "**/*.db-shm"
   ]
 }

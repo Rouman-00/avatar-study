@@ -40,6 +40,22 @@ Right-click `index.html` → **Open with Live Server** (get extension in vs code
 
 It usually opens at `http://127.0.0.1:5500/index.html`.
 
+#### Open the correct folder
+
+Open **`avatar-study/` itself** as the VS Code folder — not a parent folder.
+
+VS Code reads workspace settings only from `<opened folder>/.vscode/settings.json`. It does
+not search subfolders. If you open a parent directory, `avatar-study/.vscode/settings.json`
+is silently ignored and Live Server falls back to its defaults: it then watches the whole
+directory tree and reloads the browser on every write to `data/study.db`, i.e. on every
+interview action. The page reloads mid-session and the interview state is lost.
+
+The settings file pins Live Server's web root to `static/` and excludes the SQLite files
+from the file watcher. Both only take effect when the folder is opened correctly.
+
+Live Server reads its configuration only at startup — after changing `settings.json`, stop
+the server and start it again via **Go Live**.
+
 ---
 
 ## Dependencies & Acknowledgements
