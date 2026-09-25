@@ -19,16 +19,32 @@
             <label><input type="checkbox" id="toggle-lipsync" checked /> LipSync</label>
             <label><input type="checkbox" id="toggle-emotion" checked /> Emotion</label>
             <label><input type="checkbox" id="toggle-llm" /> LLM-Modus (freier Chatbot zum Ausprobieren)</label>
-            <label>Voice:
-                <select id="voice-select">
-                    <option value="en-US-Neural2-A">en-US-Neural2-A</option>
-                    <option value="en-US-Wavenet-A">en-US-Wavenet-A</option>
-                    <option value="en-US-Standard-A">en-US-Standard-A</option>
-                    <option value="en-US-Standard-B">en-US-Wavenet-B</option>
-                    <option value="en-US-Neural2-D">en-US-Neural2-D</option>
-                </select>
-            </label>
             </div>
+        </div>
+
+        <!-- Sprachausgabe (TTS) -->
+        <div class="section">
+            <h2>Sprachausgabe (TTS)</h2>
+            <div class="toggle-row">
+                <label><input type="radio" name="tts-provider" id="tts-provider-elevenlabs" value="elevenlabs" checked /> ElevenLabs (Standard)</label>
+                <label><input type="radio" name="tts-provider" id="tts-provider-google" value="google" /> Google Cloud TTS</label>
+            </div>
+
+            <!-- Es ist immer nur die Liste des aktiven Anbieters sichtbar. -->
+            <div id="tts-elevenlabs-settings" class="toggle-row">
+                <label>ElevenLabs-Stimme:
+                    <select id="elevenlabs-voice-select"></select>
+                </label>
+                <p id="elevenlabs-model-info" class="status"></p>
+            </div>
+
+            <div id="tts-google-settings" class="toggle-row" hidden>
+                <label>Google-Stimme:
+                    <select id="google-voice-select"></select>
+                </label>
+            </div>
+
+            <p id="tts-status" class="status"></p>
         </div>
 
         <!-- Spracherkennung (STT) -->

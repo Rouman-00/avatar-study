@@ -13,7 +13,6 @@ const statusText = document.getElementById('status-text');
 const toggleLipsync = document.getElementById('toggle-lipsync');
 const toggleEmotion = document.getElementById('toggle-emotion');
 const toggleLLM = document.getElementById('toggle-llm');
-const voiceSelect = document.getElementById('voice-select');
 
 
 
@@ -26,9 +25,157 @@ toggleEmotion.addEventListener('change', () => {
     channel.postMessage({ type: 'set_emotion', payload: { enabled: toggleEmotion.checked } });
 });
 
-voiceSelect.addEventListener('change', () => {
-    channel.postMessage({ type: 'set_voice', payload: { voice: voiceSelect.value } });
+//####### Sprachausgabe (TTS): ElevenLabs vs. Google #######
+
+// Der Anbieter ist Server-Zustand (POST /tts/provider) -- TalkingHead
+// schickt immer denselben Request-Body an /tts, das Backend entscheidet.
+// Hier wird nur die Stimme des jeweils aktiven Anbieters mitgeschickt;
+// welche Liste sichtbar ist, haengt am gewaehlten Anbieter.
+const elevenlabsVoiceSelect = document.getElementById('elevenlabs-voice-select');
+const googleVoiceSelect = document.getElementById('google-voice-select');
+const elevenlabsSettings = document.getElementById('tts-elevenlabs-settings');
+const googleSettings = document.getElementById('tts-google-settings');
+const elevenlabsModelInfo = document.getElementById('elevenlabs-model-info');
+const ttsStatusEl = document.getElementById('tts-status');
+
+let currentTtsProvider = 'elevenlabs';
+let lastReportedTtsError = null;
+
+// Aktuell gewaehlte Stimme des aktiven Anbieters -- geht als ttsVoice an den
+// Avatar und landet im /tts-Request als voice.name.
+function activeTtsVoice() {
+    return currentTtsProvider === 'elevenlabs'
+        ? elevenlabsVoiceSelect.value
+        : googleVoiceSelect.value;
+}
+
+function setTtsProviderUi(provider) {
+    currentTtsProvider = provider;
+    elevenlabsSettings.hidden = provider !== 'elevenlabs';
+    googleSettings.hidden = provider !== 'google';
+    const radio = document.querySelector(`input[name="tts-provider"][value="${provider}"]`);
+    if (radio) radio.checked = true;
+}
+
+function fillVoiceSelect(select, voices, valueKey, defaultValue) {
+    select.replaceChildren();
+    voices.forEach((voice) => {
+        const option = document.createElement('option');
+        option.value = voice[valueKey];
+        option.textContent = voice.label;
+        option.selected = voice[valueKey] === defaultValue;
+        select.appendChild(option);
+    });
+}
+
+async function loadTtsConfig() {
+    try {
+        const response = await fetch(API_URL + '/tts/config');
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || 'Server error: ' + response.status);
+        }
+
+        fillVoiceSelect(elevenlabsVoiceSelect, data.elevenlabs.voices, 'id', data.elevenlabs.default);
+        fillVoiceSelect(googleVoiceSelect, data.google.voices, 'name', data.google.default);
+        setTtsProviderUi(data.provider);
+
+        elevenlabsModelInfo.textContent = data.elevenlabs.apiKeyConfigured
+            ? `Modell: ${data.elevenlabs.modelId}`
+            : `Modell: ${data.elevenlabs.modelId} — ACHTUNG: ELEVENLABS_API_KEY ist nicht gesetzt (.env).`;
+
+        channel.postMessage({ type: 'set_voice', payload: { voice: activeTtsVoice() } });
+    } catch (error) {
+        ttsStatusEl.textContent = 'TTS-Konfiguration nicht ladbar: ' + error.message;
+    }
+}
+
+document.querySelectorAll('input[name="tts-provider"]').forEach((radio) => {
+    radio.addEventListener('change', async () => {
+        if (!radio.checked) return;
+        const previous = currentTtsProvider;
+        setTtsProviderUi(radio.value);
+        ttsStatusEl.textContent = '';
+
+        try {
+            const response = await fetch(API_URL + '/tts/provider', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: radio.value }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || 'Server error: ' + response.status);
+            }
+            lastReportedTtsError = null;
+            logSystem('TTS-Anbieter: ' + data.provider);
+            channel.postMessage({ type: 'set_voice', payload: { voice: activeTtsVoice() } });
+        } catch (error) {
+            // Umschalten am Server fehlgeschlagen -> UI zurueckdrehen, sonst
+            // zeigt das Panel einen Anbieter an, der gar nicht aktiv ist.
+            setTtsProviderUi(previous);
+            ttsStatusEl.textContent = 'Anbieterwechsel fehlgeschlagen: ' + error.message;
+        }
+    });
 });
+
+[elevenlabsVoiceSelect, googleVoiceSelect].forEach((select) => {
+    select.addEventListener('change', () => {
+        channel.postMessage({ type: 'set_voice', payload: { voice: activeTtsVoice() } });
+    });
+});
+
+// TalkingHead verwirft einen fehlgeschlagenen /tts-Aufruf im Browser
+// kommentarlos (der Avatar schweigt dann einfach). Der Fehler passiert
+// ausserdem im ANDEREN Fenster (index.html), das Panel kann ihn also nicht
+// selbst mitbekommen. Der Server meldet ihn deshalb per Server-Sent Events
+// hierher -- eine stehende Verbindung statt einer Anfrage im Sekundentakt.
+function applyTtsStatus(data) {
+    // Anbieter kann auch von aussen umgestellt worden sein (zweites Panel,
+    // Serverneustart) -- Anzeige nachziehen, aber nur bei echtem Unterschied.
+    if (data.provider && data.provider !== currentTtsProvider) {
+        setTtsProviderUi(data.provider);
+        logSystem('TTS-Anbieter (vom Server): ' + data.provider);
+    }
+
+    if (!data.lastError) {
+        lastReportedTtsError = null;
+        ttsStatusEl.textContent = '';
+        return;
+    }
+
+    const text = `TTS-Fehler (${data.lastError.provider}/${data.lastError.reason}): ${data.lastError.message}`;
+    ttsStatusEl.textContent = text;
+
+    // Nach einem Verbindungsabriss schickt der Server den aktuellen Stand
+    // erneut -- ohne diesen Vergleich stuende derselbe Fehler mehrfach im Log.
+    if (text !== lastReportedTtsError) {
+        lastReportedTtsError = text;
+        logSystem(text);
+    }
+}
+
+function connectTtsEvents() {
+    const events = new EventSource(API_URL + '/tts/events');
+
+    events.addEventListener('message', (event) => {
+        try {
+            applyTtsStatus(JSON.parse(event.data));
+        } catch (error) {
+            console.error('[control] TTS-Event nicht lesbar:', error);
+        }
+    });
+
+    // Kein eigener Reconnect noetig: EventSource verbindet nach einem Abriss
+    // (z.B. uvicorn-Neustart) von selbst wieder. Der Verbindungsindikator
+    // oben meldet ohnehin, wenn der Server weg ist.
+    events.addEventListener('error', () => {
+        console.warn('[control] TTS-Event-Verbindung unterbrochen, verbinde neu...');
+    });
+}
+
+loadTtsConfig();
+connectTtsEvents();
 
 const modelSelect = document.getElementById('model-select');
 const beamSizeRange = document.getElementById('beam-size-range');
@@ -182,7 +329,7 @@ async function sendChatMessage(message) {
         // broadcast response to avatar for speaking
         channel.postMessage({
             type: 'speak',
-            payload: { text: data.response, options: { emotion: data.emotion ?? 'neutral', ttsVoice: voiceSelect.value } },
+            payload: { text: data.response, options: { emotion: data.emotion ?? 'neutral', ttsVoice: activeTtsVoice() } },
         })
     }
     catch (error) {
@@ -325,7 +472,7 @@ async function submitInterviewAnswerFromControl(message) {
         // ist) die naechste Frage auch tatsaechlich spricht.
         channel.postMessage({
             type: 'speak',
-            payload: { text: data.text, options: { ttsVoice: voiceSelect.value } },
+            payload: { text: data.text, options: { ttsVoice: activeTtsVoice() } },
         });
     } catch (error) {
         console.error('Error:', error);

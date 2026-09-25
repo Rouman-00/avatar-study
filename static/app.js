@@ -12,7 +12,12 @@ const API_URL = 'http://127.0.0.1:8000';
 
 // Einstellungen aus control.html (per BroadcastChannel synchronisiert), z.B.
 // fuer die Sprachaufnahme-Buttons hier auf der Avatar-Seite.
-let currentTtsVoice = 'en-US-Neural2-A';
+// Stimme des aktiven TTS-Anbieters (Google-Name oder ElevenLabs-Voice-ID).
+// Welcher Anbieter gilt, entscheidet das Backend; hier wird der Wert nur
+// durchgereicht und landet im /tts-Request als voice.name. Der Startwert
+// kommt aus /tts/config, danach ueberschreibt ihn control.html per
+// 'set_voice'.
+let currentTtsVoice = '';
 let currentSttEngine = 'server';
 let currentSttDevice = 'cpu';
 let currentSttModel = 'medium';
@@ -215,6 +220,21 @@ function playAnimation(name) {
 }
 
 
+// Beim Start die Default-Stimme des aktiven Anbieters holen, damit der
+// Avatar auch ohne geoeffnetes Control-Panel mit der richtigen Stimme
+// spricht (sonst ginge eine Google-Stimme an ElevenLabs).
+async function loadTtsDefaults() {
+  try {
+    const response = await fetch(API_URL + '/tts/config');
+    const data = await response.json();
+    currentTtsVoice = data[data.provider].default;
+    console.log('[Avatar] TTS-Anbieter:', data.provider, '/ Stimme:', currentTtsVoice);
+  } catch (err) {
+    console.warn('[Avatar] TTS-Konfiguration nicht ladbar:', err);
+  }
+}
+
+loadTtsDefaults();
 initAvatar();
 
 

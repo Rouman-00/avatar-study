@@ -1,4 +1,8 @@
 {
+  // Gilt nur, wenn dieses Repo ALLEINE geoeffnet wird (z.B. nach einem
+  // frischen Clone). Pfad ist relativ zum geoeffneten Ordner, hier also
+  // ohne avatar-study/. Wird stattdessen der Elternordner AVATAR-PROJECT
+  // geoeffnet, greift dessen .vscode/settings.json mit "/avatar-study/static".
   "liveServer.settings.root": "/static",
   "liveServer.settings.ignoreFiles": [
     ".vscode/**",

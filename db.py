@@ -6,7 +6,9 @@ import sqlite3
 
 import config
 
-DB_PATH = config.BASE_DIR / "data" / "study.db"
+# Ort per .env (STUDY_DB_PATH) umlenkbar, damit Pilotlaeufe nicht in
+# der echten Erhebungsdatei landen.
+DB_PATH = config.DB_PATH
 
 
 def _connect() -> sqlite3.Connection:
