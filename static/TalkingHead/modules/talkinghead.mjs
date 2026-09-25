@@ -745,7 +745,27 @@ class TalkingHead {
       { key: "mouthSmile", mix: { mouthSmileLeft: 0.8, mouthSmileRight: 0.8 } },
       { key: "eyesClosed", mix: { eyeBlinkLeft: 1.0, eyeBlinkRight: 1.0 } },
       { key: "eyesLookUp", mix: { eyeLookUpLeft: 1.0, eyeLookUpRight: 1.0 } },
-      { key: "eyesLookDown", mix: { eyeLookDownLeft: 1.0, eyeLookDownRight: 1.0 } }
+      { key: "eyesLookDown", mix: { eyeLookDownLeft: 1.0, eyeLookDownRight: 1.0 } },
+
+      // Approximate Oculus visemes from ARKit shapes, for avatars without real
+      // viseme_* morph targets (e.g. RPM exports downloaded without the
+      // "Oculus Visemes" morph target group). Rough phoneme-shape mapping,
+      // needs visual tuning per avatar.
+      { key: "viseme_sil", mix: { mouthClose: 0.1 } },
+      { key: "viseme_PP", mix: { mouthClose: 1.0, mouthPressLeft: 0.3, mouthPressRight: 0.3, mouthRollLower: 0.2, mouthRollUpper: 0.2 } },
+      { key: "viseme_FF", mix: { mouthLowerDownLeft: 0.3, mouthLowerDownRight: 0.3, mouthPressLeft: 0.2, mouthPressRight: 0.2 } },
+      { key: "viseme_TH", mix: { jawOpen: 0.2, tongueOut: 0.3, mouthUpperUpLeft: 0.2, mouthUpperUpRight: 0.2 } },
+      { key: "viseme_DD", mix: { jawOpen: 0.2, mouthPressLeft: 0.1, mouthPressRight: 0.1 } },
+      { key: "viseme_kk", mix: { jawOpen: 0.3, mouthStretchLeft: 0.15, mouthStretchRight: 0.15 } },
+      { key: "viseme_CH", mix: { mouthFunnel: 0.6, mouthPucker: 0.3 } },
+      { key: "viseme_SS", mix: { mouthStretchLeft: 0.3, mouthStretchRight: 0.3, jawOpen: 0.1 } },
+      { key: "viseme_nn", mix: { jawOpen: 0.15, mouthPressLeft: 0.15, mouthPressRight: 0.15 } },
+      { key: "viseme_RR", mix: { mouthFunnel: 0.3, mouthPucker: 0.2, jawOpen: 0.15 } },
+      { key: "viseme_aa", mix: { jawOpen: 1.0, mouthStretchLeft: 0.1, mouthStretchRight: 0.1 } },
+      { key: "viseme_E", mix: { jawOpen: 0.4, mouthStretchLeft: 0.4, mouthStretchRight: 0.4 } },
+      { key: "viseme_I", mix: { mouthStretchLeft: 0.6, mouthStretchRight: 0.6, jawOpen: 0.2 } },
+      { key: "viseme_O", mix: { jawOpen: 0.5, mouthFunnel: 0.5, mouthPucker: 0.2 } },
+      { key: "viseme_U", mix: { mouthPucker: 0.7, mouthFunnel: 0.3, jawOpen: 0.15 } }
     ];
 
     // Anim queues
